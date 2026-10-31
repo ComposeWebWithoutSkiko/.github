@@ -2,7 +2,11 @@
 
 A fork of [Compose Multiplatform](https://github.com/JetBrains/compose-multiplatform-core) whose web targets (`wasmJs` and `js`) draw with the browser's Canvas 2D API, plus one shared WebGL 2 context where Canvas 2D can't, instead of Skia compiled to WebAssembly. Your Compose code stays the same, and `skiko.wasm` is gone.
 
-It is an independent project, not affiliated with JetBrains. It is based on Compose `1.13.0-beta01`, and it isn't published to a Maven repository yet: you build it yourself.
+It is an independent project, not affiliated with JetBrains, based on Compose `1.13.0-beta01`. You don't need to build Compose yourself: [it is published](#using-it).
+
+## Demo
+
+[emotes.redlance.org](https://emotes.redlance.org/) moves to the fork in version 2.4.0, and its footer shows the version. It is at 2.3.7 for now, which still draws with Skia.
 
 ## What it changes
 
@@ -96,10 +100,58 @@ CPU per frame, of the busiest page and GPU processes together, upstream and Canv
 
 [Full tables](https://github.com/ComposeWebWithoutSkiko/compose-web-benchmark/blob/main/results/safari.md).
 
+## Using it
+
+The fork is on a Maven repository:
+
+```kotlin
+// settings.gradle.kts
+dependencyResolutionManagement {
+    repositories {
+        maven("https://repo.redlance.org/public") {
+            content { includeVersionByRegex("(org\\.jetbrains\\.compose|io\\.coil-kt|dev\\.chrisbanes).*", ".*", ".*-webcanvas.*") }
+        }
+        mavenCentral()
+        google()
+    }
+}
+```
+
+| | modules | version | targets |
+|---|---|---|---|
+| Compose and Material 3 | | `1.13.0-beta01-webcanvas.1` | `wasmJs`, `js` |
+| `components-resources` | | `1.13.0-beta01-webcanvas.1` | `wasmJs` |
+| `coil` | `coil`, `coil-core`, `coil-compose`, `coil-compose-core`, `coil-network-core`, `coil-network-ktor3` | `3.6.3-webcanvas.1` | `wasmJs` |
+| `haze` | `haze`, `haze-blur`, `haze-utils` | `2.0.1-webcanvas.1` | `wasmJs` |
+
+It needs Kotlin 2.4.20 or newer. Keep declaring upstream's versions, Compose `1.13.0-beta01`, Coil `3.6.3` and Haze `2.0.1`, and the `org.jetbrains.compose` Gradle plugin, as the fork publishes none. Then add this rule to the `build.gradle.kts` of every module with a web target. Other targets stay on upstream:
+
+```kotlin
+configurations.all {
+    val isWeb = name.startsWith("wasmJs") || name.startsWith("js") || name.startsWith("web")
+    resolutionStrategy.eachDependency {
+        val isWasmModule = "-wasm" in requested.name
+        when (requested.group) {
+            "org.jetbrains.compose.ui",
+            "org.jetbrains.compose.runtime",
+            "org.jetbrains.compose.foundation",
+            "org.jetbrains.compose.animation",
+            "org.jetbrains.compose.material3" -> if (isWeb) useVersion("1.13.0-beta01-webcanvas.1")
+            "org.jetbrains.compose.components" ->
+                if (requested.name == "components-resources-wasmJs") useVersion("1.13.0-beta01-webcanvas.1")
+            "io.coil-kt.coil3" -> useVersion(if (isWasmModule) "3.6.3-webcanvas.1" else "3.6.3")
+            "dev.chrisbanes.haze" -> useVersion(if (isWasmModule) "2.0.1-webcanvas.1" else "2.0.1")
+        }
+    }
+}
+```
+
+A module of these libraries that isn't in the table fails to resolve. On `js` the libraries stay upstream's and fail where they use Skia, unless you build their forks yourself.
+
 ## Limitations
 
 - **It is not pixel-identical.** Text differs, because the browser draws it. Scenes of shapes match almost exactly (0.1–0.3% of pixels differ visibly in `canvas` and `layers`), scenes with some text differ in 1–5% of their pixels, and `text` in 15%. Scrolling scenes can't be compared this way, since the faster build has scrolled further.
-- **Libraries that use Skia fail where they use it.** The app still builds, and a call into `org.jetbrains.skia` throws `IrLinkageError` in the browser. Forks without Skia: [`components-resources`](https://github.com/ComposeWebWithoutSkiko/compose-multiplatform/tree/web-canvas/1.13/components/resources), [`coil`](https://github.com/ComposeWebWithoutSkiko/coil/tree/web-canvas/3.6) (without `coil-svg`) and [`haze`](https://github.com/ComposeWebWithoutSkiko/haze/tree/web-canvas/2.0) (without Glass, and its noise is a tile). They are built from source too.
+- **Libraries that use Skia fail where they use it.** The app still builds, and a call into `org.jetbrains.skia` throws `IrLinkageError` in the browser. Forks without Skia: [`components-resources`](https://github.com/ComposeWebWithoutSkiko/compose-multiplatform/tree/web-canvas/1.13/components/resources), [`coil`](https://github.com/ComposeWebWithoutSkiko/coil/tree/web-canvas/3.6) (without `coil-svg`) and [`haze`](https://github.com/ComposeWebWithoutSkiko/haze/tree/web-canvas/2.0) (without Glass, and its noise is a tile). They are published for `wasmJs`; on `js` they are built from source.
 - **Skia-only features are gone**, such as Skottie for Lottie animations.
 - **An SVG resource goes through an `<img>`:** an SVG with `<foreignObject>` isn't shown, and one without a size of its own gets the browser's natural size rather than none.
 - **A `ResourceReader` of your own** serves images, SVG, XML and fonts through `getUri`, which must be a URL the browser can fetch.
