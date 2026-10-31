@@ -10,7 +10,7 @@ The same Material 3 app, built twice, as production bundles. Medians in Chrome, 
 
 | | upstream (Skia) | Canvas 2D | |
 |---|---|---|---|
-| Download of the first screen (brotli) | 3077 KiB | 588 KiB | 5.2× smaller |
+| Download of the first screen (brotli) | 3077 KiB | 545 KiB | 5.6× smaller |
 | The same on `js` | 3074 KiB | 627 KiB | 4.9× smaller |
 | First frame | 239 ms | 95 ms | 2.5× faster |
 | The same on `js` | 469 ms | 237 ms | 2.0× faster |
